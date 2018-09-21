@@ -1,0 +1,9 @@
+{
+  "name": "agent",
+  "description": "interacts directly with device",
+  "path": "$HOME/u2f-ref-code/det2f-agent/Det2fAgent",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://pfboblefjcgdjicmnffhdgionmgcdmne/"
+  ]
+}

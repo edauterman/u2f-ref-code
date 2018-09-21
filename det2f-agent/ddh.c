@@ -1,0 +1,149 @@
+/*
+ * Copyright (c) 2018, Henry Corrigan-Gibbs
+ * 
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+ * FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+ * OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ */
+#include <openssl/evp.h>
+#include <openssl/sha.h>
+
+#include "common.h"
+#include "ddh.h"
+#include "params.h"
+
+DDHProof
+DDHProof_new (void)
+{
+  int rv = ERROR;
+  DDHProof pf = NULL;
+  CHECK_A (pf = malloc (sizeof *pf));
+
+  pf->c = NULL;
+  pf->v = NULL;
+  CHECK_A (pf->c = BN_new ());
+  CHECK_A (pf->v = BN_new ());
+
+cleanup:
+  if (rv == ERROR) {
+    DDHProof_free (pf);
+    return NULL;
+  }
+
+  return pf;
+}
+
+void
+DDHProof_free (DDHProof pf)
+{
+  if (pf->c) BN_clear_free (pf->c);
+  if (pf->v) BN_clear_free (pf->v);
+  free (pf);
+}
+
+static int
+compute_challenge (const_Params p, BIGNUM *chal,
+    const DDHStatement *st,
+    const EC_POINT *R1,
+    const EC_POINT *R2)
+{
+  int rv = ERROR;
+  const uint8_t tag_g[] = "g";
+  const uint8_t tag_gx[] = "gx";
+  const uint8_t tag_h[] = "h";
+  const uint8_t tag_hx[] = "hx";
+  const uint8_t tag_r1[] = "R1";
+  const uint8_t tag_r2[] = "R2";
+
+  uint8_t buf[SHA256_DIGEST_LENGTH];
+  EVP_MD_CTX *mdctx = NULL;
+
+  CHECK_A (mdctx = EVP_MD_CTX_create());
+  CHECK_C (EVP_DigestInit_ex (mdctx, EVP_sha256 (), NULL));
+  CHECK_C (Params_hash_point (p, mdctx, tag_g, sizeof tag_g, st->g));
+  CHECK_C (Params_hash_point (p, mdctx, tag_gx, sizeof tag_gx, st->gx));
+  CHECK_C (Params_hash_point (p, mdctx, tag_h, sizeof tag_h, st->h));
+  CHECK_C (Params_hash_point (p, mdctx, tag_hx, sizeof tag_hx, st->hx));
+  CHECK_C (Params_hash_point (p, mdctx, tag_r1, sizeof tag_r1, R1));
+  CHECK_C (Params_hash_point (p, mdctx, tag_r2, sizeof tag_r2, R2));
+  CHECK_C (EVP_DigestFinal_ex (mdctx, buf, NULL));
+
+  // The challenge should never need to be more than 256 bits.
+  CHECK_C (BN_bin2bn (buf, SHA256_DIGEST_LENGTH, chal) != NULL);
+  CHECK_C (BN_mod (chal, chal, Params_order (p), Params_ctx (p)));
+
+cleanup:
+  if (mdctx) EVP_MD_CTX_destroy (mdctx);
+  return rv;
+}
+
+/******
+ * To prove the statement, we use a three-move Sigma protocol.
+ * Write the DDH tuple as
+ *    (g, g^x, h, h^x) = (g, X, h, X').
+ * The prover proves knowledge of an x such that
+ *    X = g^x   AND   X' = g^x.
+ * Let q be the order of the group.
+ *
+ * 1) Prover chooses random r in Z_q and sends to the verifier
+ *        R = g^r   and    R' = h^r.
+ * 2) Verifier chooses random c in Z_q and sends c to the prover.
+ * 3) Prover responds with
+ *       v = r - cx    in Z_q.
+ *
+ * The verifier accepts if
+ *      g^v == R/X^c    AND   h^v == R'/(X')^c.
+ *
+ * In the random-oracle model, the prover can just send the pair
+ * (c, v) to the verifier, where c = Hash(g, X, X', R, R').
+ * The verifier computes
+ *      S = g^v . X^c  AND   S' = h^v . (X')^c
+ * and accepts iff
+ *      c == Hash(g, h, X, X', R, R').
+ */
+int
+DDHProof_verify (const_Params p, const_DDHProof pf, const DDHStatement *st)
+{
+  int rv = ERROR;
+  EC_POINT *R1 = NULL;
+  EC_POINT *R2 = NULL;
+  BIGNUM *c_test = NULL;
+
+  CHECK_A (R1 = Params_point_new (p));
+  CHECK_A (R2 = Params_point_new (p));
+  CHECK_A (c_test = BN_new ());
+
+  /*
+   * The verifier computes
+   *      S = g^v . X^c  AND   S' = h^v . (X')^c
+   * and accepts iff
+   *      c == Hash(g, h, X, X', R, R').
+   */
+
+  // Compute R1 = g^v . X^c
+  CHECK_C (Params_exp_base2 (p, R1, st->g, pf->v, st->gx, pf->c));
+  // Compute R2 = h^v . (X')^c
+  CHECK_C (Params_exp_base2 (p, R2, st->h, pf->v, st->hx, pf->c));
+
+  // c_test = Hash(g, X, h, X', R1, R2)
+  CHECK_C (compute_challenge (p, c_test, st, R1, R2));
+
+  // Accept proof iff c == c_test
+  rv = !BN_cmp (pf->c, c_test);
+
+cleanup:
+  if (R1) EC_POINT_clear_free (R1);
+  if (R2) EC_POINT_clear_free (R2);
+  if (c_test) BN_clear_free (c_test);
+
+  return rv;
+}
+
