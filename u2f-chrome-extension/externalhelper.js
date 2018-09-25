@@ -40,6 +40,7 @@ function ExternalHandler(request, helperConfig) {
  */
 ExternalHandler.prototype.run = function(cb) {
   var self = this;
+  console.log('sending to external helper');
   this.helperConfig_.sendMessage(this.helperConfig_.appId, this.request_,
       function(response) {
         if (self.closed_) {
@@ -48,12 +49,12 @@ ExternalHandler.prototype.run = function(cb) {
           return;
         }
         if (!response || !response.type) {
+          console.log(response);
           // A missing or malformed response implies the helper's output
           // can't be trusted: report the default error.
           cb(self.makeDefaultErrorReply_(self.request_));
           return;
         }
-        console.log(UTIL_fmt('got a response from external helper'));
         console.log(response);
         cb(response, self.helperConfig_.source);
       });

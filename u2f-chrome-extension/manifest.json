@@ -13,6 +13,7 @@
     "storage",
     "https://*/*",
     "http://*/*",
+    "nativeMessaging",
     {
       "usbDevices": [
         {
@@ -28,7 +29,8 @@
   ],
   "externally_connectable": {
     "matches": [
-      "https://crxjs-dot-u2fdemo.appspot.com/*"
+      "https://crxjs-dot-u2fdemo.appspot.com/*",
+      "https://u2fdemo.appspot.com/*"
     ],
     "ids": [
       "*"

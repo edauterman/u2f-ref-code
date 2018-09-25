@@ -91,6 +91,7 @@ DelegatingRequestHandler.prototype.close = function() {
  */
 DelegatingRequestHandler.prototype.helperComplete_ =
     function(tracker, index, reply, opt_source) {
+  console.log(reply);
   var logMsg = 'helper ' + index + ' completed ';
   if (reply.code !== undefined) {
     logMsg += 'with ' + reply.code.toString(16);

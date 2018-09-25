@@ -158,7 +158,6 @@ HidGnubbyDevice.prototype.hasClient = function(who) {
  * @private
  */
 HidGnubbyDevice.prototype.readLoop_ = function() {
-  //console.log(UTIL_fmt('entering readLoop'));
   if (!this.dev) return;
 
   if (this.closing) {
@@ -398,12 +397,8 @@ HidGnubbyDevice.prototype.writePump_ = function() {
     u8f[i] = u8[i];
   }
 
-  chrome.hid.send(
-      this.dev.connectionId,
-      0,  // report Id. Must be 0 for our use.
-      u8f.buffer,
-      transferComplete
-  );
+  /* Don't actually send message to device! Only local agent communicates with
+   * device. */
 };
 
 /**

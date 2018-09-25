@@ -228,30 +228,8 @@ MultipleGnubbySigner.prototype.maybeReEnumerateGnubbies_ =
  * @private
  */
 MultipleGnubbySigner.prototype.addGnubby_ = function(gnubbyId) {
-  var index = JSON.stringify(gnubbyId);
-  if (this.gnubbies_.hasOwnProperty(index)) {
-    // Can't add the same gnubby twice.
-    return false;
-  }
-  var tracker = {
-      index: index,
-      errorStatus: 0,
-      stillGoing: false,
-      signer: null
-  };
-  tracker.signer = new SingleGnubbySigner(
-      gnubbyId,
-      this.forEnroll_,
-      this.signCompletedCallback_.bind(this, tracker),
-      this.timer_.clone(),
-      this.logMsgUrl_);
-  this.gnubbies_[index] = tracker;
-  this.gnubbies_[index].stillGoing =
-      tracker.signer.doSign(this.challenges_);
-  if (!this.gnubbies_[index].errorStatus) {
-    this.gnubbies_[index].errorStatus = 0;
-  }
-  return true;
+  /* Don't actually add gnubby -- only agent should communicate with gnubby. */
+  return false;
 };
 
 /**

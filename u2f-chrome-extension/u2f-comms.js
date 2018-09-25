@@ -83,7 +83,6 @@ u2fcomms.Forwarder.prototype.onExtensionMessage_ = function(message) {
   this.pagePort_.postMessage(message);
 };
 
-
 /**
  * Connects to the extension if need be.
  * @private
@@ -91,6 +90,7 @@ u2fcomms.Forwarder.prototype.onExtensionMessage_ = function(message) {
 u2fcomms.Forwarder.prototype.connectToExtension_ = function() {
   if (this.extensionPort_)
     return;
+  //this.extensionPort_ = chrome.runtime.connectNative('agent');
   this.extensionPort_ = chrome.runtime.connect();
   if (this.extensionPort_) {
     this.extensionPort_.onMessage.addListener(

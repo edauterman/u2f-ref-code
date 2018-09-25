@@ -30,6 +30,8 @@ UsbGnubbyDevice.register(gnubbies);
 
 var REQUEST_HELPER = new DelegatingHelper();
 REQUEST_HELPER.addHelper(new UsbHelper());
+var AGENT_PORT = chrome.runtime.connectNative('agent');
+//registerNativeExternalHelper('agent');
 
 var FACTORY_REGISTRY = (function() {
   var windowTimer = new WindowTimer();
@@ -69,6 +71,7 @@ function setBleAppId(app_id) {
  * your own helper.)
  */
 var HELPER_WHITELIST = new RequestHelperWhitelist();
+HELPER_WHITELIST.addAllowedExtension('agent');
 HELPER_WHITELIST.addAllowedBlindedExtension(BLE_APP_HASH, 'BLE');
 
 /**
@@ -89,11 +92,33 @@ function registerExternalHelper(id) {
   REQUEST_HELPER.addHelper(externalHelper);
 }
 
-chrome.storage.local.get('ble_app_id', function(stored) {
+function registerNativeExternalHelper(id) {
+  var helperAppConfig = {
+    appId: id,
+    sendMessage: chrome.runtime.sendNativeMessage,
+    //sendMessage: chrome.runtime.sendMessage,
+    defaultError: DeviceStatusCodes.TIMEOUT_STATUS
+  };
+  var source = HELPER_WHITELIST.getExtensionMnemonic(id);
+  if (source) {
+    helperAppConfig.source = source;
+  }
+  var externalHelper = new ExternalHelper(helperAppConfig);
+  REQUEST_HELPER.addHelper(externalHelper);
+}
+
+
+
+/*chrome.storage.local.get('ble_app_id', function(stored) {
   if (!chrome.runtime.lastError && stored && stored.ble_app_id) {
     registerExternalHelper(stored.ble_app_id);
   }
-});
+});*/
+
+
+if (!chrome.runtime.lastError) {
+  registerNativeExternalHelper("agent");
+}
 
 /**
  * @param {*} request The received request
@@ -155,6 +180,7 @@ function sendResponseToActiveTabOnly(request, sender, sendResponse, response) {
  */
 function messageHandler(request, sender, sendResponse) {
   var responseCallback;
+  console.log(request)
   if (isRegisterRequest(request)) {
     responseCallback =
         sendResponseToActiveTabOnly.bind(null, request, sender, sendResponse);
